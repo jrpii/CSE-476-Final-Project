@@ -4,7 +4,7 @@ import argparse
 import random
 from src.utils import parse_json_input, truncate, normalize_answer
 from src.agent import call_agent, guess_domain, guess_complexity
-from src.prompts import get_system_prompt, get_extract_prompt
+from src.prompts import get_reasoning_system_prompt, get_extract_prompt
 
 # Address Unicode encoding for Windows (keep parsed data unchanged.)
 if sys.platform == 'win32':
@@ -87,15 +87,33 @@ def main():
         print(f"\nEntry {idx}/{len(data)}", flush=True)
         print(f"INPUT: {truncate(entry['input'], 500)}", flush=True)
         
-        # Get system prompt based on domain (seperated in order to add domain approximation later to handle test data).
+        # Get system prompt based on domain (seperated in order to add domain approximation).
         domain = entry.get("domain", "unknown")
-        system_prompt = get_system_prompt(domain)
-        
-        # Reasoning call
+        complexity = entry.get("complexity", "unknown")
+        system_prompt = get_reasoning_system_prompt(domain, complexity)
+
+        # Set/scale temperature and max tokens based on complexity.
+        complexity_lvl = str(complexity).lower()
+        base_max = args.max_reasoning_tokens
+        if complexity_lvl in ("extremely hard"):
+            reasoning_temp = 0.5
+            reasoning_max_tokens = int(base_max * 2)
+        elif complexity_lvl in ("hard"):
+            reasoning_temp = 0.4
+            reasoning_max_tokens = int(base_max * 1.5)
+        elif complexity_lvl == "medium":
+            reasoning_temp = 0.25
+            reasoning_max_tokens = base_max
+        else:
+            reasoning_temp = 0.0
+            reasoning_max_tokens = max(128, int(base_max * 0.5))
+
+        # CoT reasoning call.
         reasoning = call_agent(
             system_prompt=system_prompt,
             user_message=entry["input"],
-            max_tokens=args.max_reasoning_tokens
+            max_tokens=reasoning_max_tokens,
+            temperature=reasoning_temp,
         )
         
         final_answer = None

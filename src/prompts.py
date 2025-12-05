@@ -2,12 +2,12 @@
 
 # Dictionary of system prompts per domain, will expand upon later.
 SYSTEM_PROMPTS = {
-    "default": "You are a helpful assistant. Reply with only the final answer, no explanation.",
-    "math": "You are a math problem solver. Provide only the final numeric answer or final expression, as appropriate.",
-    "coding": "You are a coding assistant. Provide clear, concise code solutions.",
-    "future_prediction": "You are a prediction assistant. Provide numeric or list-style predictions based on available information.",
-    "planning": "You are a planning assistant. Provide clear, actionable plans using the action notation in the examples.",
-    "common_sense": "You are a common sense reasoning assistant. Provide logical answers based on common knowledge.",
+    "default": "You are a helpful assistant.",
+    "math": "You are a math problem solver.",
+    "coding": "You are a coding assistant.",
+    "future_prediction": "You are a prediction assistant.",
+    "planning": "You are a planning assistant.",
+    "common_sense": "You are a common sense reasoning assistant.",
     "general": "You are a helpful assistant that provides accurate answers."
 }
 
@@ -113,6 +113,35 @@ def get_system_prompt(domain: str = None) -> str:
     if domain and domain in SYSTEM_PROMPTS:
         return SYSTEM_PROMPTS[domain]
     return SYSTEM_PROMPTS["default"]
+
+# For full domain specific CoT reasoning.
+def get_reasoning_system_prompt(domain: str = None, complexity: str = None) -> str:
+    base = get_system_prompt(domain)
+
+    # Choose a CoT style based on complexity (scale effort).
+    lvl = (complexity or "").lower()
+    if lvl in ("hard", "extremely hard"):
+        cot_style = "Be deliberate and thorough in your reasoning."
+    elif lvl == "easy":
+        cot_style = "Use brief step-by-step reasoning and avoid unnecessary detail."
+    else:
+        cot_style = "Use concise step-by-step reasoning."
+
+    # Domain-specific CoT prompts.
+    if domain == "math": 
+        task = ("Solve the math problem step by step. Show intermediate computations and reasoning, then clearly state the final numeric answer or expression on its own line at the end.")
+    elif domain == "coding": 
+        task = ("Reason about the requirements and edge cases, then output a final self-contained code solution.")
+    elif domain == "planning": 
+        task = ("Think through the preconditions and effects to construct a valid sequence of actions that achieves the goal, then list the final actions in the notation used in the examples.")
+    elif domain == "future_prediction": 
+        task = ("Briefly justify your prediction using available knowledge, then clearly state the final predicted numeric value or list.")
+    elif domain == "common_sense": 
+        task = ("Use everyday knowledge and logic to reason about the question, then state the best answer in a single short sentence.")
+    else: 
+        task = ("Reason through the question in a few clear steps, then provide a single concise final answer.")
+
+    return f"{base} {cot_style} {task}"
 
 # Get answer extraction prompt with additional exampled depending on domain.
 def get_extract_prompt(domain: str = None) -> str:
