@@ -34,6 +34,14 @@ EXTRACT_EXAMPLES = {
             "answer": "1 \\pm \\sqrt{19}",
         },
         {
+            "input": "Mrs. Snyder used to spend 40% of her monthly income on rent and utilities. Her salary was recently increased by $600 so now her rent and utilities only amount to 25% of her monthly income. How much was her previous monthly income?",
+            "answer": "1000 <Or in words> Let her previous monthly income be p\nThe cost of her rent and utilities was 40% of p which is (40/100)*p = 2p/5\nHer income was increased by $600 so it is now p+$600\nThe cost of her rent and utilities now amount to 25% of (p+$600) which is (25/100)*(p+$600) = (p+$600)/4\nEquating both expressions for cost of rent and utilities: 2p/5 = (p+$600)/4\nMultiplying both sides of the equation by 20 gives 8p = 5p+$3000\nSubtracting 5p from both sides gives: 3p = $3000\nDividing both sides by 3 gives p = $1000\n#### 1000",
+        },
+        {
+            "input": "Ann, Bill, Cate, and Dale each buy personal pan pizzas cut into 4 pieces. If Bill and Dale eat 50% of their pizzas and Ann and Cate eat 75% of the pizzas, how many pizza pieces are left uneaten?",
+            "answer": "6 <or in words> In total, there are 4 x 4 = <<4*4=16>>16 pizza pieces.\nBill and Dale eat 2 x 4 x 50% = <<2*4*50*.01=4>>4 pieces.\nAnn and Cate eat 2 x 4 x 75% = <<2*4*75*.01=6>>6 pieces.\nThe four of them eat 4 + 6 = <<4+6=10>>10 pieces.\nThere are 16 - 10 = <<16-10=6>>6 pizza pieces uneaten.\n#### 6",
+        },
+        {
             "input": "A figure skater is facing north when she begins to spin to her right. She spins 2250 degrees. Which direction (north, south, east or west) is she facing when she finishes her spin?",
             "answer": "\\text{east}",
         },

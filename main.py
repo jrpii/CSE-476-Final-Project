@@ -3,7 +3,7 @@ import sys
 import argparse
 import random
 from src.utils import parse_json_input, truncate, normalize_answer
-from src.agent import call_agent
+from src.agent import call_agent, guess_domain, guess_complexity
 from src.prompts import get_system_prompt, get_extract_prompt
 
 # Address Unicode encoding for Windows (keep parsed data unchanged.)
@@ -21,6 +21,31 @@ def main():
     args = parser.parse_args()
     
     data = parse_json_input(args.input)
+
+    # Infer domain and difficulty for each entry (limit if max-entries is set).
+    if args.max_entries is not None and args.max_entries > 0:
+        max_domain_guesses = 10 * args.max_entries
+    else:
+        max_domain_guesses = None
+    domain_guess_count = 0
+
+    print(f"Inferring domain and difficulty for up to {max_domain_guesses if max_domain_guesses is not None else len(data)} entries... this may take a while...", flush=True)
+    subset = []
+    for entry in data:
+        if max_domain_guesses is not None and domain_guess_count >= max_domain_guesses:
+            break
+
+        if "domain" not in entry or not entry["domain"]:
+            entry["domain"] = guess_domain(entry.get("input", ""))
+            domain_guess_count += 1
+        if "complexity" not in entry or not entry["complexity"]:
+            entry["complexity"] = guess_complexity(entry.get("input", ""))
+
+        subset.append(entry)
+        print(f"Entry {entry.get('input', '')[:50]}: Domain: {entry.get('domain', 'unknown')}, Complexity: {entry.get('complexity', 'unknown')}", flush=True)
+    
+    if subset:
+        data = subset
 
     # Sort by domain, then randomly sample up to max-entries per domain (when domain is available, else do max overall).
     if args.max_entries is not None:
