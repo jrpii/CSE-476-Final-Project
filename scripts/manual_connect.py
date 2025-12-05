@@ -84,4 +84,4 @@ try:
         else:
             print("Error:", resp["error"])
 except KeyboardInterrupt:
-    print("Stopping...", flush=True)
+    print("Stopping...\n", flush=True)

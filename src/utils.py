@@ -18,3 +18,9 @@ def parse_json_input(file_path: str) -> List[Dict[str, Any]]:
         parsed.append(parsed_field)
     
     return parsed
+
+# Helper method to truncate text to max length (for terminal input logging w/o bloat).
+def truncate(text: str, max_len: int = 500) -> str:
+    if len(text) <= max_len:
+        return text
+    return text[:max_len] + "..."
