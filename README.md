@@ -34,3 +34,12 @@ From the project rules:
 - No hard coding tool calls.
 - No paid services or direct calling of other LLMs.
 - Efficient running, <20 LLM calls per question.
+
+### Running the Project
+Use this command to reproduce the 
+```bash
+ python main.py --input='data/cse_476_final_project_test_data.json' --max-reasoning-tokens=1024 --max-answer-tokens=128 --output='results/test_data_outputs'
+```
+
+### Submission files
+Copy of report and json output run on test set will be in the submission folder.
