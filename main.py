@@ -8,6 +8,7 @@ from datetime import datetime
 from src.utils import parse_json_input, truncate, normalize_answer
 from src.agent import call_agent, guess_domain, guess_complexity
 from src.prompts import get_reasoning_system_prompt, get_extract_prompt
+from generate_answer_template import validate_results
 
 # Address Unicode encoding for Windows (keep parsed data unchanged.)
 if sys.platform == 'win32':
@@ -32,11 +33,19 @@ def main():
         results_dir.mkdir(parents=True, exist_ok=True)
         args.output = str(results_dir / f"{Path(input_name).stem}_{ts}.json")
 
-    # Ensure parent directory output.
+    # Ensure parent directory output exists and file is created.
     if args.output is not None:
         out_path = Path(args.output)
-        if out_path.parent:
-            out_path.parent.mkdir(parents=True, exist_ok=True)
+        # Use trailing slash or existing directory as taget, make file.
+        if args.output.endswith(("/", "\\")) or out_path.is_dir():
+            out_dir = out_path
+            out_dir.mkdir(parents=True, exist_ok=True)
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            stem = Path(input_name).stem or "outputs"
+            out_path = out_dir / f"{stem}_{ts}.json"
+        else:
+            if out_path.parent:
+                out_path.parent.mkdir(parents=True, exist_ok=True)
         args.output = str(out_path)
         print(f"Logging answers to {args.output}", flush=True)
 
@@ -190,14 +199,24 @@ def main():
     except KeyboardInterrupt:
         print("\nInterupt detected, stopping after current entry....", flush=True)
     finally:
-        # If requested, write answers in grading format (like generate_answer_template.py).
+        # If requested, write answers in grading format and validate like generate_answer_template.py.
         if answers is not None and args.output:
             try:
                 with open(args.output, "w", encoding="utf-8") as fp:
                     json.dump(answers, fp, ensure_ascii=False, indent=2)
-                print(f"\nWrote {len(answers)} answers to {args.output}.", flush=True)
+
+                # Re-load and validate against the questions we actually processed.
+                with open(args.output, "r", encoding="utf-8") as fp:
+                    saved_answers = json.load(fp)
+                validate_results(data, saved_answers)
+
+                print(
+                    f"\nWrote {len(answers)} answers to {args.output} "
+                    "and validated format successfully.",
+                    flush=True,
+                )
             except Exception as e:
-                print(f"\nFailed to write answers to {args.output}: {e}", flush=True)
+                print(f"\nFailed to write/validate answers to {args.output}: {e}", flush=True)
 
     # Final correct tallys.
     print("\nFinal Correct Tallys:", flush=True)
