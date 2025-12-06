@@ -136,7 +136,10 @@ def get_reasoning_system_prompt(domain: str = None, complexity: str = None) -> s
             "instead of recomputing everything in your head."
         )
     elif domain == "coding": 
-        task = ("Reason about the requirements and edge cases, then output a final self-contained code solution.")
+        task = (
+            "Reason about the requirements and edge cases, but when you produce your final answer, "
+            "output only a self-contained code solution without extra explanation or markdown."
+        )
     elif domain == "planning": 
         task = ("Think through the preconditions and effects to construct a valid sequence of actions that achieves the goal, then list the final actions in the notation used in the examples.")
     elif domain == "future_prediction": 

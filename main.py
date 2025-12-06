@@ -166,7 +166,11 @@ def main():
 
                 if extraction["ok"] and extraction["text"] is not None:
                     model_answer = extraction["text"].strip()
-                    final_answer = normalize_answer(model_answer)
+                    # For coding tasks, keep the raw code.
+                    if domain == "coding":
+                        final_answer = model_answer
+                    else:
+                        final_answer = normalize_answer(model_answer)
                     print(f"COT ANSWER: {final_answer}", flush=True)
                 else:
                     print(f"ERROR (extraction): {extraction['error']}", flush=True)
@@ -206,7 +210,10 @@ def main():
                 # The ReAct agent loop. Gives the think, act, observe loop.
                 react_output = run_react_loop(react_input, max_steps=react_steps, temperature=reasoning_temp)
                 if react_output["ok"] and react_output.get("answer"):
-                    react_answer = normalize_answer(react_output["answer"])
+                    if domain == "coding":
+                        react_answer = react_output["answer"].strip()
+                    else:
+                        react_answer = normalize_answer(react_output["answer"])
                     print(f"REACT ANSWER ({react_steps} steps): {react_answer}", flush=True)
                 elif not react_output["ok"]:
                     print(f"REACT ERROR: {react_output['error']}", flush=True)
@@ -217,8 +224,8 @@ def main():
             else:
                 print("Skipping ReAct for this entry (react_steps=0).", flush=True)
 
-            # Log answer for grading.
-            if final_answer is None and react_answer is not None:
+            # Log answer for grading. Prefer ReAct answer when available.
+            if react_answer is not None:
                 final_answer = react_answer
             if answers is not None:
                 answers.append({"output": final_answer if final_answer is not None else ""})
