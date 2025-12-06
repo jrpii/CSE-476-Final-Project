@@ -1,6 +1,10 @@
 ### Simple agent for making LLM API calls and related helpers.
+import re
+from typing import Any, Dict, List, Optional
 import requests
 from scripts.config import get_api_key, get_api_base, get_model_name
+from src.prompts import get_react_system_prompt
+from src.tools import run_tool
 
 API_KEY = get_api_key()
 API_BASE = get_api_base()
@@ -10,7 +14,8 @@ MODEL = get_model_name()
 DOMAINS = ["math", "coding", "future_prediction", "planning", "common_sense"]
 COMPLEXITY_LEVELS = ["easy", "medium", "hard", "extremely hard"]
 
-def call_agent(system_prompt: str, user_message: str, max_tokens: int = 512, temperature: float = 0.0, timeout: int = 120) -> dict:
+# Chat helper that works with message history for ReAct agent.
+def chat_agent(messages: List[Dict[str, str]], max_tokens: int = 512, temperature: float = 0.0, timeout: int = 120) -> Dict[str, Any]:
     # Build request URL and headers (like notebook).
     url = f"{API_BASE}/chat/completions"
     headers = {
@@ -19,10 +24,7 @@ def call_agent(system_prompt: str, user_message: str, max_tokens: int = 512, tem
     }
     payload = {
         "model": MODEL,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_message}
-        ],
+        "messages": messages, # Now pass in message history to give it persistent context.
         "temperature": temperature,
         "max_tokens": max_tokens,
     }
@@ -34,15 +36,22 @@ def call_agent(system_prompt: str, user_message: str, max_tokens: int = 512, tem
             data = resp.json()
             text = data.get("choices", [{}])[0].get("message", {}).get("content", "")
             return {"ok": True, "text": text.strip() if text else None, "error": None}
-        else:
+        try:
             # try best-effort to surface error text
-            try:
-                error_text = resp.json()
-            except:
-                error_text = resp.text
-            return {"ok": False, "text": None, "error": str(error_text)}
+            error_text = resp.json()
+        except:
+            error_text = resp.text
+        return {"ok": False, "text": None, "error": str(error_text)}
     except requests.RequestException as e:
         return {"ok": False, "text": None, "error": str(e)}
+
+# Simpler CoT-style call w/ system prompt and user message.
+def call_agent(system_prompt: str, user_message: str, max_tokens: int = 512, temperature: float = 0.0, timeout: int = 120) -> Dict[str, Any]:
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_message},
+    ]
+    return chat_agent(messages, max_tokens=max_tokens, temperature=temperature, timeout=timeout)
 
 # Have model infere domain lavel from question.
 def guess_domain(text: str) -> str:
@@ -87,3 +96,61 @@ def guess_complexity(text: str) -> str:
 
     label = resp["text"].strip().lower().split()[0]
     return label if label in COMPLEXITY_LEVELS else "medium"
+
+# Parse action from the message.
+def parse_action(text: str) -> Optional[Dict[str, str]]:
+    for line in reversed(text.splitlines()):
+        line = line.strip()
+
+        if line.lower().startswith("action:"):
+            body = line.split(":", 1)[1].strip()
+            # Expect format Action: <TOOL_NAME>[ARGUMENT]
+            match = re.match(r"<(\w+)>\[(.*)\]", body)
+            if match:
+                return {"tool": match.group(1), "argument": match.group(2)}
+    return None
+
+# Parse final answer from the mressage.
+def parse_final_answer(text: str) -> Optional[str]:
+    for line in reversed(text.splitlines()):
+        if "final answer" in line.lower():
+            parts = line.split(":", 1)
+            return parts[1].strip() if len(parts) > 1 else line.strip()
+    return None
+
+# Run a single ReAct itteration for a question (ReAct loop is Think, Act, Observe).
+def run_react_loop(question: str, max_steps: int = 3, temperature: float = 0.2) -> Dict[str, Any]:
+    system_prompt = get_react_system_prompt()
+    messages: List[Dict[str, str]] = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": question},
+    ]
+    trace: List[str] = []
+
+    # Run loop for the max number of steps (<20 calls required on high end).
+    for _ in range(max_steps):
+        response = chat_agent(messages, max_tokens=512, temperature=temperature)
+        if not response["ok"]:
+            return {"ok": False, "answer": None, "trace": "\n".join(trace), "error": response["error"]}
+
+        text = response.get("text") or ""
+        trace.append(text)
+        messages.append({"role": "assistant", "content": text})
+        final = parse_final_answer(text)
+
+        if final is not None:
+            return {"ok": True, "answer": final, "trace": "\n".join(trace), "error": None}
+
+        action = parse_action(text)
+        if action is None:
+            break
+
+        observation = run_tool(action["tool"], action["argument"])
+        messages.append({"role": "user", "content": f"[Observation]: {observation}"})
+
+    return {
+        "ok": False,
+        "answer": None,
+        "trace": "\n".join(trace),
+        "error": "No final answer produced within max_steps.",
+    }

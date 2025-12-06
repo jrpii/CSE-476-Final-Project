@@ -143,6 +143,21 @@ def get_reasoning_system_prompt(domain: str = None, complexity: str = None) -> s
 
     return f"{base} {cot_style} {task}"
 
+# System prompt for ReAct agent.
+def get_react_system_prompt() -> str:
+    return (
+        "You are a reasoning agent that can think step by step and use tools.\n"
+        "You may interleave natural language thoughts with tool calls.\n"
+        "When you want to use a tool, write a line of the form:\n"
+        "Action: <TOOL_NAME>[ARGUMENT]\n"
+        "For example: 'Action: <math>[2*(3+4)]' or 'Action: <python>[def f(x): return x+1]'.\n"
+        "After you receive an observation from the tool (it will be shown as a line starting with '[Observation]:'), continue reasoning.\n"
+        "When you are ready to answer, write a line starting with 'Final Answer:'.\n\n"
+        "Available tools:\n"
+        "- math: evaluate arithmetic or use functions from Python's math module.\n"
+        "- python: check whether a short Python snippet compiles; returns 'OK' or an error.\n"
+    )
+
 # Get answer extraction prompt with additional exampled depending on domain.
 def get_extract_prompt(domain: str = None) -> str:
     prompt = EXTRACT_SYSTEM_PROMPT
