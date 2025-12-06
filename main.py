@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from datetime import datetime
 from src.utils import parse_json_input, truncate, normalize_answer
-from src.agent import call_agent, guess_domain, guess_complexity
+from src.agent import call_agent, guess_domain, guess_complexity, run_react_loop
 from src.prompts import get_reasoning_system_prompt, get_extract_prompt
 from generate_answer_template import validate_results
 
@@ -140,17 +140,13 @@ def main():
                 reasoning_max_tokens = max(128, int(base_max * 0.5))
 
             # CoT reasoning call.
-            reasoning = call_agent(
-                system_prompt=system_prompt,
-                user_message=entry["input"],
-                max_tokens=reasoning_max_tokens,
-                temperature=reasoning_temp,
-            )
+            reasoning = call_agent(system_prompt=system_prompt, user_message=entry["input"], max_tokens=reasoning_max_tokens, temperature=reasoning_temp)
 
             final_answer = None
+            react_answer = None
 
-            # If no error, print reasoning and then extract the answer.
-            if reasoning["ok"]:
+            # Extraction CoT reasoning and log CoT answer.
+            if reasoning["ok"] and reasoning.get("text"):
                 print(f"REASONING OUTPUT:\n{reasoning['text']}", flush=True)
 
                 # Extraction call
@@ -171,13 +167,59 @@ def main():
                 if extraction["ok"] and extraction["text"] is not None:
                     model_answer = extraction["text"].strip()
                     final_answer = normalize_answer(model_answer)
-                    print(f"FINAL ANSWER: {final_answer}", flush=True)
+                    print(f"COT ANSWER: {final_answer}", flush=True)
                 else:
                     print(f"ERROR (extraction): {extraction['error']}", flush=True)
             else:
                 print(f"ERROR (reasoning): {reasoning['error']}", flush=True)
 
+            # ReAct usage policy: decide steps by difficulty and domain.
+            react_steps = 0
+            if complexity_lvl == "easy":
+                if domain in ("math", "coding"):
+                    react_steps = 5
+            elif complexity_lvl == "medium":
+                react_steps = 8
+            elif complexity_lvl in ("hard"):
+                react_steps = 10
+            elif complexity_lvl in ("extremely hard"):
+                react_steps = 12
+
+            # Build ReAct input from question and CoT reasoning. If needed it can use tools or think harder.
+            react_input = entry["input"]
+            if reasoning["ok"] and reasoning.get("text"):
+                react_input = (
+                    "Question:\n"
+                    f"{entry['input']}\n\n"
+                    "Initial chain-of-thought draft solution:\n"
+                    f"{reasoning['text']}\n\n"
+                    "Use the available tools to double-check any computations or logic "
+                    "and, if helpful, refine the final answer."
+                )
+
+            if react_steps > 0:
+                print(
+                    f"Running ReAct (steps={react_steps}, domain={domain}, complexity={complexity_lvl})",
+                    flush=True,
+                )
+                print(f"REACT INPUT (truncated): {truncate(react_input, 500)}", flush=True)
+                # The ReAct agent loop. Gives the think, act, observe loop.
+                react_output = run_react_loop(react_input, max_steps=react_steps, temperature=reasoning_temp)
+                if react_output["ok"] and react_output.get("answer"):
+                    react_answer = normalize_answer(react_output["answer"])
+                    print(f"REACT ANSWER ({react_steps} steps): {react_answer}", flush=True)
+                elif not react_output["ok"]:
+                    print(f"REACT ERROR: {react_output['error']}", flush=True)
+                # Print the ReAct trace.
+                if react_output.get("trace"):
+                    print("REACT TRACE (raw):", flush=True)
+                    print(truncate(react_output["trace"], 1200), flush=True)
+            else:
+                print("Skipping ReAct for this entry (react_steps=0).", flush=True)
+
             # Log answer for grading.
+            if final_answer is None and react_answer is not None:
+                final_answer = react_answer
             if answers is not None:
                 answers.append({"output": final_answer if final_answer is not None else ""})
 

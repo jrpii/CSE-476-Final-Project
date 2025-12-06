@@ -129,7 +129,12 @@ def get_reasoning_system_prompt(domain: str = None, complexity: str = None) -> s
 
     # Domain-specific CoT prompts.
     if domain == "math": 
-        task = ("Solve the math problem step by step. Show intermediate computations and reasoning, then clearly state the final numeric answer or expression on its own line at the end.")
+        task = (
+            "Solve the math problem step by step. Show intermediate computations and reasoning, "
+            "then clearly state the final numeric answer or expression on its own line at the end. "
+            "You may trust results from tools (for example, combinatorics or digit-sum helpers) "
+            "instead of recomputing everything in your head."
+        )
     elif domain == "coding": 
         task = ("Reason about the requirements and edge cases, then output a final self-contained code solution.")
     elif domain == "planning": 
@@ -156,6 +161,7 @@ def get_react_system_prompt() -> str:
         "Available tools:\n"
         "- math: evaluate arithmetic or use functions from Python's math module.\n"
         "- python: check whether a short Python snippet compiles; returns 'OK' or an error.\n"
+        "- reflect: ask you to think more carefully or check your answer for consistency.\n"
     )
 
 # Get answer extraction prompt with additional exampled depending on domain.

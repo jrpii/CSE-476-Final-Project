@@ -104,8 +104,7 @@ def parse_action(text: str) -> Optional[Dict[str, str]]:
 
         if line.lower().startswith("action:"):
             body = line.split(":", 1)[1].strip()
-            # Expect format Action: <TOOL_NAME>[ARGUMENT]
-            match = re.match(r"<(\w+)>\[(.*)\]", body)
+            match = re.match(r"<(\w+)>\[(.*)\]", body) # Action: <TOOL_NAME>[ARGUMENT]
             if match:
                 return {"tool": match.group(1), "argument": match.group(2)}
     return None
@@ -147,6 +146,30 @@ def run_react_loop(question: str, max_steps: int = 3, temperature: float = 0.2) 
 
         observation = run_tool(action["tool"], action["argument"])
         messages.append({"role": "user", "content": f"[Observation]: {observation}"})
+
+    # Make one last call that forces the model to commit to a final answer (if step limit reached).
+    if trace:
+        user = (
+            "You have reached the step limit for using tools.\n"
+            "Based on the entire conversation and all observations above, "
+            "you must now provide the final answer.\n"
+            "Respond with a single line starting with 'Final Answer:' followed by the answer, "
+            "and do not include any additional explanation."
+        )
+        messages.append({"role": "user", "content": user})
+        forced_resp = chat_agent(messages, max_tokens=256, temperature=0.0)
+        if forced_resp["ok"] and forced_resp.get("text"):
+            text = forced_resp["text"] or ""
+            trace.append(text)
+            final = parse_final_answer(text)
+            if final is not None:
+                return {"ok": True, "answer": final, "trace": "\n".join(trace), "error": None}
+            return {
+                "ok": False,
+                "answer": None,
+                "trace": "\n".join(trace),
+                "error": "Failed to produce a 'Final Answer:' line.",
+            }
 
     return {
         "ok": False,
