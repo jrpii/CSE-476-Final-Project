@@ -20,6 +20,14 @@ conda activate cse476-agent
 pip install -r requirements.txt
 ```
 
+Create .env file:
+The model chosen will be based on the API base, model name, and api key if provided. Below is the configuration to the projects model, accessible only locally via VPN connection to ASU. But should be configurable to any API or self hosted model in theory.
+```
+OPENAI_API_KEY=cse476
+API_BASE=http://10.4.58.53:41701/v1
+MODEL=bens_model
+```
+
 ### Layout
 - `src/` - all agent source code
 - `data/` - datasets (dev/test)
@@ -40,6 +48,16 @@ Use this command to reproduce the
 ```bash
  python main.py --input='data/cse_476_final_project_test_data.json' --max-reasoning-tokens=1024 --max-answer-tokens=128 --output='results/test_data_outputs'
 ```
+
+### Implementation Details
+Techniques Employed:
+- Chain of Thought reasoning with answer extraction
+- ReAct Agent Loop (Think -> Act -> Observe)
+- Reasoning Effort Scaling (based on difficulty)
+- Addaptive Prompting (based on domain)
+- LLM-as-a-Judge (to infere domain and dicciculty)
+-Tool Integration
+
 
 ### Submission files
 Copy of report and json output run on test set will be in the submission folder.
